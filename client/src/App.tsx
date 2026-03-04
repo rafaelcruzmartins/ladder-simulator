@@ -1,41 +1,195 @@
+import { useEffect, useRef, useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
-import ErrorBoundary from "./components/ErrorBoundary";
-import { ThemeProvider } from "./contexts/ThemeContext";
-import Home from "./pages/Home";
+import LadderGrid from "@/components/LadderGrid";
+import IOPanel from "@/components/IOPanel";
+import {
+  createRung,
+  createTimer,
+  createVariable,
+  initializeExecutionState,
+  simulateScan,
+} from "@/engine/simulateScan";
+import { ExecutionState, Project, Variable } from "@/engine/types";
+import "./App.css";
 
-
-function Router() {
-  return (
-    <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
-      <Route component={NotFound} />
-    </Switch>
-  );
+/**
+ * Default example project with a simple ladder logic
+ */
+function createDefaultProject(): Project {
+  return {
+    id: "default_project",
+    name: "Example Ladder Logic",
+    scanCycleMs: 50,
+    variables: [
+      createVariable("input_1", "Button A", "input"),
+      createVariable("input_2", "Button B", "input"),
+      createVariable("output_1", "LED 1", "output"),
+      createVariable("output_2", "LED 2", "output"),
+      createVariable("memory_1", "Memory Bit", "memory"),
+    ],
+    rungs: [
+      {
+        id: "rung_1",
+        cells: [
+          [
+            { type: "contact_no", variableId: "input_1" },
+            { type: "wire_h" },
+            { type: "coil", variableId: "output_1" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+          ],
+        ],
+      },
+      {
+        id: "rung_2",
+        cells: [
+          [
+            { type: "contact_no", variableId: "input_2" },
+            { type: "wire_h" },
+            { type: "coil_set", variableId: "memory_1" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+          ],
+        ],
+      },
+      {
+        id: "rung_3",
+        cells: [
+          [
+            { type: "contact_no", variableId: "memory_1" },
+            { type: "wire_h" },
+            { type: "coil", variableId: "output_2" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+          ],
+        ],
+      },
+    ],
+    timers: [],
+  };
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
 function App() {
+  const [project, setProject] = useState<Project>(createDefaultProject());
+  const [executionState, setExecutionState] = useState<ExecutionState>(
+    initializeExecutionState(createDefaultProject())
+  );
+  const [isRunning, setIsRunning] = useState(true);
+  const scanIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastScanRef = useRef(Date.now());
+
+  // Main scan cycle loop
+  useEffect(() => {
+    if (!isRunning) return;
+
+    scanIntervalRef.current = setInterval(() => {
+      const now = Date.now();
+      const deltaMs = now - lastScanRef.current;
+      lastScanRef.current = now;
+
+      setExecutionState((prevState) => {
+        const newState = simulateScan(project, prevState, deltaMs);
+        return newState;
+      });
+    }, project.scanCycleMs);
+
+    return () => {
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current);
+      }
+    };
+  }, [isRunning, project]);
+
+  // Handle project changes
+  const handleProjectChange = (newProject: Project) => {
+    setProject(newProject);
+    // Reset execution state with new project
+    setExecutionState(initializeExecutionState(newProject));
+  };
+
+  // Handle input changes
+  const handleInputChange = (variableId: string, value: boolean) => {
+    setExecutionState((prevState) => {
+      const newVariables = prevState.variables.map((v) =>
+        v.id === variableId ? { ...v, value } : v
+      );
+      return { ...prevState, variables: newVariables };
+    });
+  };
+
+  // Handle adding new variable
+  const handleAddVariable = (type: "input" | "output" | "memory") => {
+    const newVariable = createVariable(
+      `var_${Date.now()}`,
+      `${type.charAt(0).toUpperCase() + type.slice(1)} ${project.variables.length + 1}`,
+      type
+    );
+    setProject({
+      ...project,
+      variables: [...project.variables, newVariable],
+    });
+  };
+
+  // Handle deleting variable
+  const handleDeleteVariable = (variableId: string) => {
+    setProject({
+      ...project,
+      variables: project.variables.filter((v) => v.id !== variableId),
+    });
+  };
+
   return (
-    <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
-      </ThemeProvider>
-    </ErrorBoundary>
+    <div className="app">
+      <header className="app-header">
+        <div className="header-content">
+          <h1>Ladder Logic PLC Simulator</h1>
+          <div className="header-controls">
+            <button
+              className={`btn-control ${isRunning ? "running" : "stopped"}`}
+              onClick={() => setIsRunning(!isRunning)}
+            >
+              {isRunning ? "⏸ Pause" : "▶ Run"}
+            </button>
+            <span className={`status ${isRunning ? "running" : "stopped"}`}>
+              {isRunning ? "Running" : "Paused"}
+            </span>
+          </div>
+        </div>
+      </header>
+
+      <main className="app-main">
+        <div className="main-content">
+          <LadderGrid project={project} onProjectChange={handleProjectChange} />
+          <IOPanel
+            project={project}
+            executionState={executionState}
+            onInputChange={handleInputChange}
+            onAddVariable={handleAddVariable}
+            onDeleteVariable={handleDeleteVariable}
+          />
+        </div>
+      </main>
+
+      <TooltipProvider>
+        <Toaster />
+      </TooltipProvider>
+    </div>
   );
 }
 

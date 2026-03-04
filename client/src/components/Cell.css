@@ -1,0 +1,161 @@
+/**
+ * Cell Component Styles
+ */
+
+.cell-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.cell {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 1px solid #ddd;
+  background-color: #fafafa;
+  transition: all 0.2s ease;
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  user-select: none;
+  position: relative;
+}
+
+.cell:hover {
+  background-color: #f0f0f0;
+  border-color: #999;
+}
+
+.cell-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+}
+
+.cell-label {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.cell-var-label {
+  position: absolute;
+  bottom: 2px;
+  font-size: 9px;
+  color: #666;
+  max-width: 95%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Cell type styles */
+.cell-empty {
+  background-color: #fafafa;
+}
+
+.cell-wire_h,
+.cell-wire_v {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.cell-contact_no,
+.cell-contact_nc {
+  background-color: #e3f2fd;
+  color: #1565c0;
+}
+
+.cell-coil,
+.cell-coil_set,
+.cell-coil_reset {
+  background-color: #fff3e0;
+  color: #e65100;
+}
+
+.cell-timer_ton,
+.cell-timer_tof {
+  background-color: #f3e5f5;
+  color: #6a1b9a;
+}
+
+/* Menu styles */
+.cell-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: white;
+  border: 1px solid #999;
+  border-radius: 4px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 180px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.cell-menu-header {
+  padding: 8px 12px;
+  background-color: #f5f5f5;
+  font-weight: bold;
+  font-size: 11px;
+  color: #666;
+  border-bottom: 1px solid #ddd;
+  text-transform: uppercase;
+}
+
+.cell-menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: #333;
+  transition: background-color 0.15s ease;
+}
+
+.cell-menu-item:hover {
+  background-color: #e8f5e9;
+}
+
+.cell-menu-item.active {
+  background-color: #c8e6c9;
+  font-weight: bold;
+}
+
+.cell-menu-close {
+  border-top: 1px solid #ddd;
+  font-weight: bold;
+  color: #666;
+}
+
+.cell-submenu {
+  background-color: #fafafa;
+  border-top: 1px solid #ddd;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.cell-preset-input {
+  width: calc(100% - 24px);
+  margin: 8px 12px;
+  padding: 4px 6px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.cell-preset-input:focus {
+  outline: none;
+  border-color: #2196f3;
+  box-shadow: 0 0 4px rgba(33, 150, 243, 0.3);
+}

@@ -1,0 +1,142 @@
+/**
+ * App Main Styles
+ */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #f5f5f5;
+}
+
+.app-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+}
+
+.header-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-control {
+  padding: 8px 16px;
+  background-color: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 2px solid white;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-control:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn-control.running {
+  background-color: rgba(76, 175, 80, 0.3);
+  border-color: #4caf50;
+}
+
+.btn-control.stopped {
+  background-color: rgba(244, 67, 54, 0.3);
+  border-color: #f44336;
+}
+
+.status {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status.running {
+  background-color: rgba(76, 175, 80, 0.3);
+  color: #4caf50;
+}
+
+.status.stopped {
+  background-color: rgba(244, 67, 54, 0.3);
+  color: #f44336;
+}
+
+.app-main {
+  flex: 1;
+  overflow: hidden;
+  padding: 16px;
+}
+
+.main-content {
+  display: flex;
+  gap: 16px;
+  height: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Responsive layout */
+@media (max-width: 1024px) {
+  .main-content {
+    flex-direction: column;
+  }
+
+  .app-header h1 {
+    font-size: 20px;
+  }
+
+  .header-content {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    padding: 12px;
+  }
+
+  .app-main {
+    padding: 12px;
+  }
+
+  .main-content {
+    gap: 12px;
+  }
+
+  .app-header h1 {
+    font-size: 18px;
+  }
+
+  .header-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
