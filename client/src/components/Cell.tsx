@@ -14,6 +14,7 @@ interface CellProps {
   row: number;
   col: number;
   variables: Variable[];
+  isEnergized?: boolean;
   onCellChange: (row: number, col: number, newCell: GridCell) => void;
 }
 
@@ -48,6 +49,7 @@ export default function Cell({
   row,
   col,
   variables,
+  isEnergized = false,
   onCellChange,
 }: CellProps) {
   const [showMenu, setShowMenu] = useState(false);
@@ -107,11 +109,21 @@ export default function Cell({
 
   const selectedVariable = variables.find((v) => v.id === cell.variableId);
 
+  // Close menu when clicking outside
+  const handleContainerClick = (e: React.MouseEvent) => {
+    if (e.currentTarget === e.target) {
+      setShowMenu(false);
+    }
+  };
+
   return (
-    <div className="cell-container">
+    <div className="cell-container" onClick={handleContainerClick}>
       <div
-        className={`cell cell-${cell.type}`}
-        onClick={() => setShowMenu(!showMenu)}
+        className={`cell cell-${cell.type} ${isEnergized ? "energized" : ""}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          setShowMenu(!showMenu);
+        }}
         title={`${CELL_LABELS[cell.type]} (Row ${row}, Col ${col})`}
       >
         <div className="cell-content">

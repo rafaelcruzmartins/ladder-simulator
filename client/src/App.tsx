@@ -224,7 +224,7 @@ function App() {
 
       <main className="app-main">
         <div className="main-content">
-          <LadderGrid project={project} onProjectChange={handleProjectChange} />
+          <LadderGrid project={project} executionState={executionState} onProjectChange={handleProjectChange} />
           <IOPanel
             project={project}
             executionState={executionState}

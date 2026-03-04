@@ -1,14 +1,16 @@
 /**
- * Ladder Logic Simulator - Execution Engine (v3)
+ * Ladder Logic Simulator - Execution Engine (v4)
  * 
- * Fixed propagation model:
+ * Fixed propagation model with energized cell tracking:
  * - Left rail is always energized (virtual source)
  * - Energy propagates right through conducting cells
  * - Coils are energized if energy reaches them
+ * - Returns which cells are energized for visualization
  */
 
 import {
   CellType,
+  EnergizedCellsMap,
   ExecutionState,
   GridCell,
   Project,
@@ -68,7 +70,7 @@ function canConductEnergy(
 
 /**
  * Propagate energy through a single row (left to right)
- * Returns true if energy reaches the end (right rail)
+ * Returns which columns are energized
  */
 function propagateRowEnergy(
   row: GridCell[],
@@ -108,6 +110,7 @@ function evaluateRung(
 ): RungEvaluationResult {
   let updatedVariables = [...variables];
   const updatedTimers = [...timers];
+  const energizedCells = new Set<string>();
 
   const rows = rung.cells.length;
   const cols = rung.cells[0]?.length ?? 0;
@@ -132,6 +135,7 @@ function evaluateRung(
     // Mark energized cells in this row
     energized.forEach((col) => {
       cellEnergized[r][col] = true;
+      energizedCells.add(`${r}-${col}`);
     });
 
     // Rung is energized if any row reaches the end
@@ -166,6 +170,10 @@ function evaluateRung(
               value: energyReachesCoil,
             };
           }
+          // Mark coil as energized if it's being set
+          if (energyReachesCoil) {
+            energizedCells.add(`${r}-${c}`);
+          }
           break;
         }
 
@@ -181,6 +189,7 @@ function evaluateRung(
                 value: true,
               };
             }
+            energizedCells.add(`${r}-${c}`);
           }
           break;
         }
@@ -197,6 +206,7 @@ function evaluateRung(
                 value: false,
               };
             }
+            energizedCells.add(`${r}-${c}`);
           }
           break;
         }
@@ -213,6 +223,9 @@ function evaluateRung(
               value: energyReachesCoil,
             };
           }
+          if (energyReachesCoil) {
+            energizedCells.add(`${r}-${c}`);
+          }
           break;
         }
       }
@@ -223,6 +236,7 @@ function evaluateRung(
     energized: rungEnergized,
     variables: updatedVariables,
     timers: updatedTimers,
+    energizedCells,
   };
 }
 
@@ -281,7 +295,7 @@ function updateTimers(
  * 1. Snapshot input states
  * 2. Execute rungs sequentially with energy propagation
  * 3. Update timer states
- * 4. Return new execution state
+ * 4. Return new execution state with energized cells
  */
 export function simulateScan(
   project: Project,
@@ -290,14 +304,17 @@ export function simulateScan(
 ): ExecutionState {
   let variables = [...currentState.variables];
   let timers = [...currentState.timers];
+  const energizedCells: EnergizedCellsMap = {};
 
   // Step 1: Snapshot inputs (already done in currentState)
 
   // Step 2: Execute each rung sequentially
-  for (const rung of project.rungs) {
+  for (let rungIdx = 0; rungIdx < project.rungs.length; rungIdx++) {
+    const rung = project.rungs[rungIdx];
     const result = evaluateRung(rung, variables, timers);
     variables = result.variables;
     timers = result.timers;
+    energizedCells[rungIdx] = result.energizedCells;
   }
 
   // Step 3: Update timer states
@@ -308,6 +325,7 @@ export function simulateScan(
     timers,
     isRunning: currentState.isRunning,
     lastScanTime: Date.now(),
+    energizedCells,
   };
 }
 
@@ -320,6 +338,7 @@ export function initializeExecutionState(project: Project): ExecutionState {
     timers: [...project.timers],
     isRunning: false,
     lastScanTime: Date.now(),
+    energizedCells: {},
   };
 }
 

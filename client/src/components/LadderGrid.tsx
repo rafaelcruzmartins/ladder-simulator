@@ -11,10 +11,11 @@ import "./LadderGrid.css";
 
 interface LadderGridProps {
   project: Project;
+  executionState?: any;
   onProjectChange: (project: Project) => void;
 }
 
-export default function LadderGrid({ project, onProjectChange }: LadderGridProps) {
+export default function LadderGrid({ project, executionState, onProjectChange }: LadderGridProps) {
   const handleCellChange = (
     rungIndex: number,
     row: number,
@@ -141,6 +142,7 @@ export default function LadderGrid({ project, onProjectChange }: LadderGridProps
                           row={rowIndex}
                           col={colIndex}
                           variables={project.variables}
+                          isEnergized={executionState?.energizedCells?.[rungIndex]?.has(`${rowIndex}-${colIndex}`) ?? false}
                           onCellChange={(r, c, newCell) =>
                             handleCellChange(rungIndex, r, c, newCell)
                           }

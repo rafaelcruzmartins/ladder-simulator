@@ -31,6 +31,19 @@
   border-color: #999;
 }
 
+/* Energized cell indicator */
+.cell.energized {
+  box-shadow: inset 0 0 8px rgba(76, 175, 80, 0.6), 0 0 12px rgba(76, 175, 80, 0.4);
+  background-color: rgba(76, 175, 80, 0.15);
+  border-color: #4caf50;
+  border-width: 2px;
+}
+
+.cell.energized .cell-label {
+  color: #2e7d32;
+  font-weight: bold;
+}
+
 .cell-content {
   display: flex;
   align-items: center;

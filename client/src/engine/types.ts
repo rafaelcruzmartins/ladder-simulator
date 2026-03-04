@@ -81,6 +81,13 @@ export interface Project {
 }
 
 /**
+ * Energized cells map: rung index -> set of "row-col" keys
+ */
+export interface EnergizedCellsMap {
+  [rungIndex: number]: Set<string>;
+}
+
+/**
  * Execution state for the simulator
  */
 export interface ExecutionState {
@@ -88,6 +95,7 @@ export interface ExecutionState {
   timers: TimerState[];
   isRunning: boolean;
   lastScanTime: number;
+  energizedCells: EnergizedCellsMap;  // Track which cells are energized
 }
 
 /**
@@ -97,4 +105,5 @@ export interface RungEvaluationResult {
   energized: boolean;
   variables: Variable[];
   timers: TimerState[];
+  energizedCells: Set<string>;  // "row-col" format
 }
