@@ -1,11 +1,10 @@
 /**
- * Ladder Logic Simulator - Execution Engine
+ * Ladder Logic Simulator - Execution Engine (v3)
  * 
- * This module implements the core PLC simulation logic:
- * - Scan cycle execution
- * - Rung evaluation (series/parallel logic)
- * - Timer management (TON, TOF)
- * - Variable state management
+ * Fixed propagation model:
+ * - Left rail is always energized (virtual source)
+ * - Energy propagates right through conducting cells
+ * - Coils are energized if energy reaches them
  */
 
 import {
@@ -18,6 +17,214 @@ import {
   TimerState,
   Variable,
 } from "./types";
+
+/**
+ * Check if a cell conducts energy (used during propagation)
+ */
+function canConductEnergy(
+  cell: GridCell,
+  variables: Variable[],
+  timers: TimerState[]
+): boolean {
+  switch (cell.type) {
+    case "empty":
+    case "wire_h":
+    case "wire_v":
+      // Wires and empty cells are transparent
+      return true;
+
+    case "contact_no": {
+      // Normally open: conducts if variable is TRUE
+      if (!cell.variableId) return false;
+      const variable = variables.find((v) => v.id === cell.variableId);
+      return variable?.value ?? false;
+    }
+
+    case "contact_nc": {
+      // Normally closed: conducts if variable is FALSE
+      if (!cell.variableId) return false;
+      const variable = variables.find((v) => v.id === cell.variableId);
+      return !(variable?.value ?? false);
+    }
+
+    case "coil":
+    case "coil_set":
+    case "coil_reset":
+      // Coils don't conduct, they consume energy
+      return false;
+
+    case "timer_ton":
+    case "timer_tof": {
+      // Timer contacts: conduct if timer done bit is set
+      if (!cell.variableId) return false;
+      const timer = timers.find((t) => t.variableId === cell.variableId);
+      return timer?.done ?? false;
+    }
+
+    default:
+      return false;
+  }
+}
+
+/**
+ * Propagate energy through a single row (left to right)
+ * Returns true if energy reaches the end (right rail)
+ */
+function propagateRowEnergy(
+  row: GridCell[],
+  variables: Variable[],
+  timers: TimerState[]
+): { energized: Set<number>; reachesEnd: boolean } {
+  const energized = new Set<number>();
+  let currentlyEnergized = true; // Left rail is always energized
+
+  for (let col = 0; col < row.length; col++) {
+    const cell = row[col];
+
+    if (currentlyEnergized) {
+      // Energy is flowing, check if this cell conducts
+      if (canConductEnergy(cell, variables, timers)) {
+        energized.add(col);
+      } else {
+        // Energy stops here (coil or blocked contact)
+        currentlyEnergized = false;
+      }
+    }
+  }
+
+  return {
+    energized,
+    reachesEnd: currentlyEnergized,
+  };
+}
+
+/**
+ * Evaluate a single rung using row-by-row energy propagation
+ */
+function evaluateRung(
+  rung: Rung,
+  variables: Variable[],
+  timers: TimerState[]
+): RungEvaluationResult {
+  let updatedVariables = [...variables];
+  const updatedTimers = [...timers];
+
+  const rows = rung.cells.length;
+  const cols = rung.cells[0]?.length ?? 0;
+
+  // Track which cells are energized
+  const cellEnergized: boolean[][] = Array(rows)
+    .fill(null)
+    .map(() => Array(cols).fill(false));
+
+  // Determine rung energization (OR of all rows)
+  let rungEnergized = false;
+
+  // Propagate energy through each row
+  for (let r = 0; r < rows; r++) {
+    const row = rung.cells[r];
+    const { energized, reachesEnd } = propagateRowEnergy(
+      row,
+      updatedVariables,
+      updatedTimers
+    );
+
+    // Mark energized cells in this row
+    energized.forEach((col) => {
+      cellEnergized[r][col] = true;
+    });
+
+    // Rung is energized if any row reaches the end
+    if (reachesEnd) {
+      rungEnergized = true;
+    }
+  }
+
+  // Process coils based on energized cells
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const cell = rung.cells[r][c];
+      const isEnergized = cellEnergized[r][c];
+
+      // Check if energy reaches this cell (it's energized AND it's a coil)
+      if (!cell.variableId) continue;
+
+      // Energy reaches a coil if the cell before it is energized
+      // OR if it's the first cell and left rail is energized
+      const energyReachesCoil =
+        c === 0 || cellEnergized[r][c - 1] || (c === 0 && true);
+
+      switch (cell.type) {
+        case "coil": {
+          // Regular coil: set to energization state
+          const varIndex = updatedVariables.findIndex(
+            (v) => v.id === cell.variableId
+          );
+          if (varIndex >= 0) {
+            updatedVariables[varIndex] = {
+              ...updatedVariables[varIndex],
+              value: energyReachesCoil,
+            };
+          }
+          break;
+        }
+
+        case "coil_set": {
+          // Set coil: set to TRUE if energized
+          if (energyReachesCoil) {
+            const varIndex = updatedVariables.findIndex(
+              (v) => v.id === cell.variableId
+            );
+            if (varIndex >= 0) {
+              updatedVariables[varIndex] = {
+                ...updatedVariables[varIndex],
+                value: true,
+              };
+            }
+          }
+          break;
+        }
+
+        case "coil_reset": {
+          // Reset coil: set to FALSE if energized
+          if (energyReachesCoil) {
+            const varIndex = updatedVariables.findIndex(
+              (v) => v.id === cell.variableId
+            );
+            if (varIndex >= 0) {
+              updatedVariables[varIndex] = {
+                ...updatedVariables[varIndex],
+                value: false,
+              };
+            }
+          }
+          break;
+        }
+
+        case "timer_ton":
+        case "timer_tof": {
+          // Timer coil: energize based on cell state
+          const varIndex = updatedVariables.findIndex(
+            (v) => v.id === cell.variableId
+          );
+          if (varIndex >= 0) {
+            updatedVariables[varIndex] = {
+              ...updatedVariables[varIndex],
+              value: energyReachesCoil,
+            };
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  return {
+    energized: rungEnergized,
+    variables: updatedVariables,
+    timers: updatedTimers,
+  };
+}
 
 /**
  * Update timer states based on elapsed time and energization status
@@ -68,185 +275,11 @@ function updateTimers(
 }
 
 /**
- * Evaluate a single cell in the ladder grid
- * Returns true if the cell conducts energy (is energized)
- */
-function evaluateCell(
-  cell: GridCell,
-  variables: Variable[],
-  timers: TimerState[]
-): boolean {
-  switch (cell.type) {
-    case "empty":
-    case "wire_h":
-    case "wire_v":
-      // Wires and empty cells are transparent (pass through energy)
-      return true;
-
-    case "contact_no": {
-      // Normally open contact: conducts if variable is TRUE
-      if (!cell.variableId) return false;
-      const variable = variables.find((v) => v.id === cell.variableId);
-      return variable?.value ?? false;
-    }
-
-    case "contact_nc": {
-      // Normally closed contact: conducts if variable is FALSE
-      if (!cell.variableId) return false;
-      const variable = variables.find((v) => v.id === cell.variableId);
-      return !(variable?.value ?? false);
-    }
-
-    case "coil":
-    case "coil_set":
-    case "coil_reset":
-      // Coils don't conduct energy, they consume it
-      return false;
-
-    case "timer_ton":
-    case "timer_tof": {
-      // Timer contacts: conduct if timer done bit is set
-      if (!cell.variableId) return false;
-      const timer = timers.find((t) => t.variableId === cell.variableId);
-      return timer?.done ?? false;
-    }
-
-    default:
-      return false;
-  }
-}
-
-/**
- * Evaluate a horizontal line (series connection) in the ladder
- * All cells must conduct for the line to be energized
- */
-function evaluateHorizontalLine(
-  cells: GridCell[],
-  variables: Variable[],
-  timers: TimerState[]
-): boolean {
-  // Empty line conducts energy
-  if (cells.length === 0) return true;
-
-  // All cells in series must conduct
-  return cells.every((cell) => evaluateCell(cell, variables, timers));
-}
-
-/**
- * Evaluate a rung (horizontal branch of the ladder)
- * Handles parallel branches (multiple paths from left to right)
- */
-function evaluateRung(
-  rung: Rung,
-  variables: Variable[],
-  timers: TimerState[]
-): RungEvaluationResult {
-  const updatedVariables = [...variables];
-  const updatedTimers = [...timers];
-
-  // For now, we treat each row as a series path
-  // Multiple rows represent parallel branches
-  let rungEnergized = false;
-
-  // Evaluate each row (parallel branch)
-  for (const row of rung.cells) {
-    const rowEnergized = evaluateHorizontalLine(row, updatedVariables, updatedTimers);
-    rungEnergized = rungEnergized || rowEnergized;
-  }
-
-  // Process coils in the rung
-  for (const row of rung.cells) {
-    for (const cell of row) {
-      if (!cell.variableId) continue;
-
-      switch (cell.type) {
-        case "coil": {
-          // Regular coil: set to rung energization state
-          const varIndex = updatedVariables.findIndex(
-            (v) => v.id === cell.variableId
-          );
-          if (varIndex >= 0) {
-            updatedVariables[varIndex] = {
-              ...updatedVariables[varIndex],
-              value: rungEnergized,
-            };
-          }
-          break;
-        }
-
-        case "coil_set": {
-          // Set coil: set to TRUE if rung is energized
-          if (rungEnergized) {
-            const varIndex = updatedVariables.findIndex(
-              (v) => v.id === cell.variableId
-            );
-            if (varIndex >= 0) {
-              updatedVariables[varIndex] = {
-                ...updatedVariables[varIndex],
-                value: true,
-              };
-            }
-          }
-          break;
-        }
-
-        case "coil_reset": {
-          // Reset coil: set to FALSE if rung is energized
-          if (rungEnergized) {
-            const varIndex = updatedVariables.findIndex(
-              (v) => v.id === cell.variableId
-            );
-            if (varIndex >= 0) {
-              updatedVariables[varIndex] = {
-                ...updatedVariables[varIndex],
-                value: false,
-              };
-            }
-          }
-          break;
-        }
-
-        case "timer_ton":
-        case "timer_tof": {
-          // Timer coil: energize the timer
-          const timerIndex = updatedTimers.findIndex(
-            (t) => t.variableId === cell.variableId
-          );
-          if (timerIndex >= 0) {
-            updatedTimers[timerIndex] = {
-              ...updatedTimers[timerIndex],
-              // Timer variable is set to rung energization state
-            };
-            // Update the corresponding variable for the timer
-            const varIndex = updatedVariables.findIndex(
-              (v) => v.id === cell.variableId
-            );
-            if (varIndex >= 0) {
-              updatedVariables[varIndex] = {
-                ...updatedVariables[varIndex],
-                value: rungEnergized,
-              };
-            }
-          }
-          break;
-        }
-      }
-    }
-  }
-
-  return {
-    energized: rungEnergized,
-    variables: updatedVariables,
-    timers: updatedTimers,
-  };
-}
-
-/**
  * Execute a single scan cycle
  * 
  * Scan cycle steps:
  * 1. Snapshot input states
- * 2. Execute rungs sequentially
+ * 2. Execute rungs sequentially with energy propagation
  * 3. Update timer states
  * 4. Return new execution state
  */

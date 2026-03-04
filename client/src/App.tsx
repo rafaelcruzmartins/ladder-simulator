@@ -14,21 +14,24 @@ import { ExecutionState, Project, Variable } from "@/engine/types";
 import "./App.css";
 
 /**
- * Default example project with a simple ladder logic
+ * Default example project with improved test cases
  */
 function createDefaultProject(): Project {
   return {
     id: "default_project",
-    name: "Example Ladder Logic",
+    name: "Ladder Logic Test Suite",
     scanCycleMs: 50,
     variables: [
       createVariable("input_1", "Button A", "input"),
       createVariable("input_2", "Button B", "input"),
       createVariable("output_1", "LED 1", "output"),
       createVariable("output_2", "LED 2", "output"),
+      createVariable("output_3", "LED 3", "output"),
       createVariable("memory_1", "Memory Bit", "memory"),
     ],
     rungs: [
+      // Rung 1: Simple contact -> coil
+      // Button A (NO contact) -> LED 1
       {
         id: "rung_1",
         cells: [
@@ -46,12 +49,35 @@ function createDefaultProject(): Project {
           ],
         ],
       },
+
+      // Rung 2: NC contact (normally closed)
+      // NOT Button B -> LED 2
       {
         id: "rung_2",
         cells: [
           [
-            { type: "contact_no", variableId: "input_2" },
+            { type: "contact_nc", variableId: "input_2" },
             { type: "wire_h" },
+            { type: "coil", variableId: "output_2" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+          ],
+        ],
+      },
+
+      // Rung 3: Series logic (AND)
+      // Button A AND Button B -> Memory Bit (SET)
+      {
+        id: "rung_3",
+        cells: [
+          [
+            { type: "contact_no", variableId: "input_1" },
+            { type: "contact_no", variableId: "input_2" },
             { type: "coil_set", variableId: "memory_1" },
             { type: "empty" },
             { type: "empty" },
@@ -63,13 +89,36 @@ function createDefaultProject(): Project {
           ],
         ],
       },
+
+      // Rung 4: Parallel logic (OR) with memory
+      // Memory Bit -> LED 3
       {
-        id: "rung_3",
+        id: "rung_4",
         cells: [
           [
             { type: "contact_no", variableId: "memory_1" },
             { type: "wire_h" },
-            { type: "coil", variableId: "output_2" },
+            { type: "coil", variableId: "output_3" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+            { type: "empty" },
+          ],
+        ],
+      },
+
+      // Rung 5: Reset memory
+      // Button B resets memory
+      {
+        id: "rung_5",
+        cells: [
+          [
+            { type: "contact_no", variableId: "input_2" },
+            { type: "wire_h" },
+            { type: "coil_reset", variableId: "memory_1" },
             { type: "empty" },
             { type: "empty" },
             { type: "empty" },
